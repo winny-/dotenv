@@ -11,6 +11,8 @@
                   #:rest (or/c (listof path-string?) (listof (listof path-string?)))
                   (listof boolean?))]))
 
+(define *dotenv-ignore-error?* (make-parameter #t))
+
 (define (ignorable-line? line)
   (or 
    (eq? (string-length line) 0)
@@ -32,9 +34,13 @@
           (cons (process-line line) vars))))))
 
 (define (load-file filename vars)
-  (let ([file 
-         (sequence->stream (in-lines (open-input-file filename)))])
-    (append vars (process-file file '()))))
+  (with-handlers ([exn:fail:filesystem? (λ (e)
+                                          (if (*dotenv-ignore-error?*)
+                                              vars
+                                              (raise e)))])
+    (let ([file 
+           (sequence->stream (in-lines (open-input-file filename)))])
+      (append vars (process-file file '())))))
 
 (define (load-files files vars)
   (if (empty? files)
